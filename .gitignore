@@ -1,0 +1,36 @@
+# ===== ESP-IDF 构建产物 =====
+build/
+managed_components/
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.bak
+*.elf
+*.bin
+*.map
+
+# ===== Python 虚拟环境与缓存 =====
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+
+# ===== 密钥与敏感文件（绝对不能提交！）=====
+secure_boot/
+tools/ca/ca_private.pem
+tools/ca/device_cert.der
+tools/ca/device_cert.b64
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+.clangd
+compile_commands.json
+.DS_Store
+
+# ===== 日志与临时文件 =====
+*.log
+*.swp
+*.tmp
+*~
