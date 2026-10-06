@@ -22,7 +22,8 @@ static const char *TAG = "espid";
 
 #define NVS_NS        "espid"
 #define KEY_PRIV      "priv"      /* 设备私钥（DER） */
-#define KEY_CERT      "cert"      /* CA 签发的证书（DER） */
+#define KEY_CERT      "cert"      /* CA 签发的设备证书（DER） */
+#define KEY_USERCACERT "ucacert"  /* 用户 CA 证书（由根 CA 签发）*/
 #define KEY_PASSHASH  "passhash"  /* 密码派生值（32B 盐 + 32B hash） */
 
 static mbedtls_ecp_keypair s_key;      /* 设备密钥对（内存中） */
@@ -258,6 +259,35 @@ esp_err_t espid_set_cert(const uint8_t *der, size_t len) {
     if (err == ESP_OK) err = nvs_commit(h);
     nvs_close(h);
     return err;
+}
+
+esp_err_t espid_set_user_ca_cert(const uint8_t *der, size_t len) {
+    if (!der || len == 0 || len > 1024) return ESP_ERR_INVALID_ARG;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+    err = nvs_set_blob(h, KEY_USERCACERT, der, len);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err;
+}
+
+bool espid_has_user_ca_cert(void) {
+    size_t len = 0;
+    return nvs_get_blob_len(KEY_USERCACERT, &len) == ESP_OK && len > 0;
+}
+
+int espid_get_user_ca_cert(uint8_t *out, size_t cap) {
+    size_t len = 0;
+    if (nvs_get_blob_len(KEY_USERCACERT, &len) != ESP_OK) return -1;
+    if (len > cap) return -1;
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) return -1;
+    size_t rlen = len;
+    esp_err_t err = nvs_get_blob(h, KEY_USERCACERT, out, &rlen);
+    nvs_close(h);
+    if (err != ESP_OK) return -1;
+    return (int)rlen;
 }
 
 int espid_get_cert(uint8_t *out, size_t cap) {

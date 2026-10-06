@@ -1,6 +1,7 @@
 # ===== ESP-IDF 构建产物 =====
 build/
 managed_components/
+build-chain/
 sdkconfig
 sdkconfig.old
 sdkconfig.defaults.bak
@@ -18,9 +19,7 @@ __pycache__/
 
 # ===== 密钥与敏感文件（绝对不能提交！）=====
 secure_boot/
-tools/ca/ca_private.pem
-tools/ca/device_cert.der
-tools/ca/device_cert.b64
+tools/ca/
 
 # ===== 编辑器 / IDE =====
 .vscode/

@@ -153,8 +153,10 @@ idf.py build flash monitor
 |------|------|
 | `ID_PUB` | 打印设备公钥（供 CA 签名） |
 | `ID_FP` | 打印设备公钥 SHA-256 指纹（用于人工核对） |
-| `SETCERT <base64 DER>` | 安装 CA 签发的设备证书 |
-| `ID_CERT` | 读取已安装的设备证书 |
+| `GETCERT` | 读取已安装证书链（两段：`设备证书\|中间CA证书`；单段时仅设备证书） |
+| `SETCERT <base64 DER>[\|<中间CA证书b64>]` | 安装证书链：仅设备证书，或“设备证书+中间CA证书”两段 |
+| `AUTH <base64 nonce>` | 挑战-响应：用设备私钥签名随机数（返回 `SIG:<base64>`） |
+| `WHOAMI` | 打印设备身份概览（公钥/指纹/证书状态） |
 
 ### 其他
 
@@ -167,18 +169,68 @@ idf.py build flash monitor
 
 ## 本地 CA 证书签发流程
 
-设备身份模块实现了一套完整的信任链：**本地 CA → 设备证书 → WebCrypto 验签**。
+设备身份模块实现一套 **SSL/TLS 式三级证书链**：
+
+```
+根 CA（root，离线） ──签──▶ 中间 CA 证书（0x10） ──签──▶ 设备证书（0x02）
+客户端只内置【根 CA 公钥】，验签全程离线（不写网、不写死域名/IP）
+```
+
+设备端只需做两件事：**导出公钥** 和 **安装证书链**；签发全在 PC / 官方工具完成。
+
+### ① 设备端：导出公钥
+
+设备上电，经 BLE 发送：
+
+```
+WHOAMI        # 概览（含公钥/指纹/证书状态）
+ID_PUB        # 只取设备公钥（hex，65 字节，04 开头，130 字符）
+```
+
+用 nRF Connect、web 页或 passless 均可发送。
+
+### ② PC 端：签发证书链（`tools/atri-ca.py`）
 
 ```bash
-# 1. 设备端：ID_PUB 打印公钥（hex 或 base64）
+cd tools
 
-# 2. PC 端：用 atri-ca.py 签发
-python3 tools/atri-ca.py sign --pub <设备公钥> --out cert.der
+# （一次性）生成中间 CA 密钥对
+python3 atri-ca.py uca-init
 
-# 3. 设备端：SETCERT <base64 DER> 写回
+# 用官方工具签发中间 CA 证证书（推荐）：
+#   打开 https://esp.oleanderchat.asia/ ，填 deployment_id + 中间CA公钥，点签发
+#   把返回的证书保存为 ca/uca_cert.b64
+#   （也可本地离线签发：python3 atri-ca.py root-sign-uca "$(python3 atri-ca.py uca-pub)" <deployment_id>）
 
-# 4. 网页端：内置 CA 公钥，验签设备证书 + 验设备签名
+# 用中间 CA 给设备签证书，并拼成两段链
+UCACERT=$(cat ca/uca_cert.b64)
+python3 atri-ca.py uca-sign <设备公钥hex> <deployment_id> "$UCACERT"
+# → 打印：SETCERT <设备证书>|<中间CA证书>
 ```
+
+### ③ 设备端：安装证书链
+
+把上一步打印的整条 `SETCERT <设备证书>|<中间CA证书>` 经 BLE 发送给设备。
+固件分段存入 NVS（设备证书 1 段 + 中间 CA 证书 1 段）。
+
+```
+SETCERT <base64(设备证书)>|<base64(中间CA证书)>
+```
+
+### ④ 验证
+
+```
+GETCERT       # 应返回两段：OK CERT:<设备证书>|<中间CA证书>
+```
+
+然后网页端（内置根 CA 公钥）或 app 连上设备，会自动验完整条三级链并弹窗展示
+**deployment_id**，确认设备归属。
+
+> 📐 **deployment_id（部署标识）**：由你自定（如 `lianyu-tianhai`），签发时内嵌进证书。
+> 客户端验签后展示给用户确认“这是我自己部署的设备”，并可在签发器端防抢注。
+> 详见顶层 [`../README.md`](../README.md#命名)。
+>
+> 🌐 网页端：**https://esp.oleanderchat.asia/**
 
 ---
 

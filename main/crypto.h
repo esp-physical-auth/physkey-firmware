@@ -44,6 +44,14 @@ esp_err_t espid_set_cert(const uint8_t *der, size_t len);
 /* 读取设备证书 */
 int espid_get_cert(uint8_t *out, size_t cap);
 
+/* ---- 两级 CA 链：用户 CA 证书 ---- */
+/* 保存“用户 CA 证书”（由根 CA 签发；设备证书由用户 CA 签发）。 */
+esp_err_t espid_set_user_ca_cert(const uint8_t *der, size_t len);
+/* 读取用户 CA 证书；未安装返回 -1。 */
+int espid_get_user_ca_cert(uint8_t *out, size_t cap);
+/* 是否已安装用户 CA 证书。 */
+bool espid_has_user_ca_cert(void);
+
 /* ---- 密码保护 ---- */
 /* 是否已设置密码 */
 bool esp_pass_is_set(void);

@@ -108,7 +108,7 @@ static uint8_t own_addr_type;
 static uint16_t tx_val_handle;
 static uint16_t conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
-static char rx_buf[512];
+static char rx_buf[2048];
 static size_t rx_len = 0;
 static bool rx_has_len = false;
 static size_t rx_expect = 0;
@@ -209,7 +209,7 @@ static void handle_command(char *line) {
      */
     static const char *kOpenCmds[] = {
         "HASPASS", "SETPASS", "AUTHPASS", "HELP", "WHOAMI",
-        "GETCERT", "SETCERT", "AUTH", "TIME", "WIPE", NULL
+        "GETCERT", "SETCERT", "SETCERT_DEV", "SETCERT_UCA", "AUTH", "TIME", "WIPE", NULL
     };
     bool gated = true;
     for (int i = 0; kOpenCmds[i]; i++) {
@@ -389,24 +389,98 @@ static void handle_command(char *line) {
         if (b64) free(b64);
         if (b64fp) free(b64fp);
     } else if (strcasecmp(cmd, "GETCERT") == 0) {
-        /* 返回 CA 签发的设备证书（base64），网页用 CA 公钥验签 */
+        /* 返回 CA 签发的设备证书（base64）。若同时装有“用户 CA 证书”，
+         * 则返回两段：“设备证书|用户CA证书”（| 分隔），供客户端链式验签。
+         * 旧单 CA 模式仅返回设备证书。*/
         uint8_t cert[1024];
         int clen = espid_get_cert(cert, sizeof(cert));
         if (clen <= 0) { tx_send("ERR no cert installed\n"); return; }
         char *b64 = b64_encode(cert, clen);
-        snprintf(resp, sizeof(resp), "OK CERT:%s\n", b64 ? b64 : "");
-        tx_send(resp);
-        if (b64) free(b64);
+        if (!b64) { tx_send("ERR encode failed\n"); return; }
+
+        uint8_t ucacert[1024];
+        int uclen = espid_get_user_ca_cert(ucacert, sizeof(ucacert));
+        if (uclen > 0) {
+            char *ub64 = b64_encode(ucacert, uclen);
+            if (ub64) {
+                /* 拼接：设备证书 | 用户CA证书 */
+                size_t need = strlen(b64) + 1 + strlen(ub64) + 1;
+                char *combined = (char *)malloc(need);
+                if (combined) {
+                    snprintf(combined, need, "%s|%s", b64, ub64);
+                    /* 分两次 tx_send，避免超出单条 resp 缓冲区 */
+                    char *resp2 = (char *)malloc(strlen(combined) + 16);
+                    if (resp2) {
+                        snprintf(resp2, strlen(combined) + 16, "OK CERT:%s\n", combined);
+                        tx_send(resp2);
+                        free(resp2);
+                    }
+                    free(combined);
+                }
+                free(ub64);
+            } else {
+                snprintf(resp, sizeof(resp), "OK CERT:%s\n", b64);
+                tx_send(resp);
+            }
+        } else {
+            snprintf(resp, sizeof(resp), "OK CERT:%s\n", b64);
+            tx_send(resp);
+        }
+        free(b64);
     } else if (strcasecmp(cmd, "SETCERT") == 0) {
-        /* 写入 CA 签发的证书（base64 DER） */
+        /* 写入证书。支持两种形式：
+         *   SETCERT <b64der>                  —— 仅设备证书（旧单 CA 模式）
+         *   SETCERT <devb64>|<ucacertb64>     —— 设备证书 + 中间CA证书（三级链） */
         char *b64 = strtok(NULL, " \t\r\n");
-        if (!b64) { tx_send("ERR usage: SETCERT <b64der>\n"); return; }
+        if (!b64) { tx_send("ERR usage: SETCERT <b64der>[|<ucacert_b64>]\n"); return; }
+
+        char *pipe = strchr(b64, '|');
+        char *devb64 = b64;
+        char *ucab64 = NULL;
+        if (pipe) { *pipe = '\0'; ucab64 = pipe + 1; }
+
+        /* 1) 设备证书 */
+        size_t dlen = 0;
+        uint8_t *der = b64_decode(devb64, &dlen);
+        if (!der || dlen == 0) { tx_send("ERR bad base64 (dev cert)\n"); if (der) free(der); return; }
+        esp_err_t err = espid_set_cert(der, dlen);
+        free(der);
+        if (err != ESP_OK) { tx_send("ERR cert store failed\n"); return; }
+
+        /* 2) 中间 CA 证书（可选） */
+        if (ucab64 && ucab64[0]) {
+            size_t ulen = 0;
+            uint8_t *uder = b64_decode(ucab64, &ulen);
+            if (!uder || ulen == 0) { tx_send("ERR bad base64 (user ca cert)\n"); if (uder) free(uder); return; }
+            esp_err_t uerr = espid_set_user_ca_cert(uder, ulen);
+            free(uder);
+            if (uerr != ESP_OK) { tx_send("ERR user ca cert store failed\n"); return; }
+            tx_send("OK cert chain installed\n");
+        } else {
+            tx_send("OK cert installed\n");
+        }
+    } else if (strcasecmp(cmd, "SETCERT_DEV") == 0) {
+        /* 分帧写入：单独写设备证书（避免整条链超长）。名 SETCERT_DEV <devb64> */
+        char *b64 = strtok(NULL, " \t\r\n");
+        if (!b64) { tx_send("ERR usage: SETCERT_DEV <b64der>\n"); return; }
         size_t dlen = 0;
         uint8_t *der = b64_decode(b64, &dlen);
         if (!der || dlen == 0) { tx_send("ERR bad base64\n"); if (der) free(der); return; }
         esp_err_t err = espid_set_cert(der, dlen);
         free(der);
-        tx_send(err == ESP_OK ? "OK cert installed\n" : "ERR cert store failed\n");
+        if (err != ESP_OK) { tx_send("ERR cert store failed\n"); return; }
+        tx_send("OK dev cert installed\n");
+    } else if (strcasecmp(cmd, "SETCERT_UCA") == 0) {
+        /* 分帧写入：单独写中间 CA 证书。名 SETCERT_UCA <ucab64> */
+        char *b64 = strtok(NULL, " \t\r\n");
+        if (!b64) { tx_send("ERR usage: SETCERT_UCA <b64der>\n"); return; }
+        size_t ulen = 0;
+        uint8_t *uder = b64_decode(b64, &ulen);
+        if (!uder || ulen == 0) { tx_send("ERR bad base64\n"); if (uder) free(uder); return; }
+        esp_err_t uerr = espid_set_user_ca_cert(uder, ulen);
+        free(uder);
+        if (uerr != ESP_OK) { tx_send("ERR user ca cert store failed\n"); return; }
+        tx_send("OK uca cert installed\n");
     } else if (strcasecmp(cmd, "AUTH") == 0) {
         /* 挑战-响应：对网页给的随机数用设备私钥签名 */
         char *b64 = strtok(NULL, " \t\r\n");
@@ -1048,7 +1122,7 @@ void ble_totp_handle_line(char *line) {
  */
 static void console_task(void *arg) {
     (void)arg;
-    char line[512];
+    char line[2048];
     size_t len = 0;
     while (1) {
         int c = getchar();
