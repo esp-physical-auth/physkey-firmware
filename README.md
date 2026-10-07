@@ -31,7 +31,7 @@
 ## 目录结构
 
 ```
-esp32c5-totp/
+physkey-firmware/
 ├── CMakeLists.txt              顶层工程（目标芯片 esp32c5）
 ├── partitions.csv              自定义分区表（4MB Flash，app 分区 0x20000 起）
 ├── sdkconfig.defaults          默认配置（NimBLE / Wi-Fi / mbedTLS SHA1）
