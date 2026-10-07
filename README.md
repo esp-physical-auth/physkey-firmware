@@ -118,7 +118,7 @@ idf.py build flash monitor
 | `CHGPASS <旧> <新>` | 修改密码 |
 | `LOCK` | 手动锁定（清除内存主密钥） |
 
-### TOTP
+### TOTP（需先解锁）
 
 | 指令 | 说明 |
 |------|------|
