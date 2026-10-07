@@ -1,4 +1,4 @@
-# ESP32-C5 TOTP 自定义分区表（支持 Secure Boot V2）
+# ESP32 TOTP 自定义分区表（支持 Secure Boot V2）
 # 名称,    类型, 子类型,  偏移,    大小
 # 分区表在 0x9000（bootloader 区 0x2000~0x9000 留够签名块空间）
 nvs,        data, nvs,     0xa000,   0x6000

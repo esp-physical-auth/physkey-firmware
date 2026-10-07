@@ -1,5 +1,5 @@
 /*
- * ESP32-C5 BLE TOTP 认证器
+ * ESP32 BLE TOTP 认证器
  * 手机通过 BLE(NUS) 增删 TOTP 密钥并获取临时验证码
  */
 
@@ -81,7 +81,7 @@ static void wifi_init_sta(void) {
 #endif /* ENABLE_SNTP */
 
 void app_main(void) {
-    ESP_LOGI(TAG, "==== ESP32-C5 TOTP Authenticator starting ====");
+    ESP_LOGI(TAG, "==== ESP32 TOTP Authenticator starting ====");
 
     /* 1. 初始化存储 */
     if (totp_store_init() != 0) {

@@ -1,6 +1,6 @@
-# ESP32-C5 硬件安全认证器 🦀
+# ESP32 硬件安全认证器 🦀
 
-基于 **ESP32-C5** 的多功能硬件认证器，集成 **TOTP 两步验证**、**WebAuthn/FIDO2 凭证**、**ECDSA 钱包私钥** 和 **设备身份证书**。手机或 PC 通过 **BLE（NUS 服务）** 连接后即可远程管理，密钥永不出芯片。
+基于 **ESP32** 的多功能硬件认证器，集成 **TOTP 两步验证**、**WebAuthn/FIDO2 凭证**、**ECDSA 钱包私钥** 和 **设备身份证书**。手机或 PC 通过 **BLE（NUS 服务）** 连接后即可远程管理，密钥永不出芯片。
 
 > 设备广播名：`ATRI-TOTP`
 
@@ -22,9 +22,9 @@
 
 ## 硬件要求
 
-- **ESP32-C5** 开发板（其他支持 BLE 的 ESP32 变体亦可）
+- **ESP32** 开发板（其他支持 BLE 的 ESP32 变体亦可）
 - USB 数据线
-- **ESP-IDF v5.4+**（ESP32-C5 正式支持从 5.4 开始）
+- **ESP-IDF v5.4+**（ESP32 正式支持从 5.4 开始）
 
 ---
 
@@ -97,7 +97,7 @@ idf.py build flash monitor
 ./flash-secure.sh --full
 ```
 
-> ⚠️ **血的教训**：ESP32-C5 使用 **AES-XTS** 加密，加密时必须加 `--aes_xts` 参数。地址必须与 `partitions.csv` 对齐——app 分区从 `0x20000` 起（不是 `0x10000`），地址写错会导致固件永远启动不了。详见脚本内注释。
+> ⚠️ **血的教训**：ESP32 使用 **AES-XTS** 加密，加密时必须加 `--aes_xts` 参数。地址必须与 `partitions.csv` 对齐——app 分区从 `0x20000` 起（不是 `0x10000`），地址写错会导致固件永远启动不了。详见脚本内注释。
 
 ---
 
@@ -273,7 +273,7 @@ bootloader 在 `0x2000`，分区表在 `0x9000`，app 在 `0x20000`。Flash 加�
 ## 依赖
 
 - **ESP-IDF v5.4+**
-- **NimBLE**（ESP32-C5 推荐的 BLE 协议栈，sdkconfig.defaults 已配好）
+- **NimBLE**（ESP32 推荐的 BLE 协议栈，sdkconfig.defaults 已配好）
 - **mbedTLS**（硬件加速 SHA1 / SHA256 / ECDSA / AES-GCM）
 - **Bleak**（Python BLE 客户端，用于测试脚本，`.venv/` 已包含）
 

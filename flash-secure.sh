@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# flash-secure.sh — ESP32-C5 安全固件一键烧录脚本
+# flash-secure.sh — ESP32 安全固件一键烧录脚本
 #
-# 适用：已启用 Flash 加密 + Secure Boot V2 的 ESP32-C5
+# 适用：已启用 Flash 加密 + Secure Boot V2 的 ESP32
 # 自动完成：备份 → 编译 → 签名 → AES-XTS 加密 → 烧录
 #
 # ★ 关键避坑（血的教训）★
-#   1. ESP32-C5 用 AES-XTS 加密，加密时必须加 --aes_xts，否则启动失败！
+#   1. ESP32 用 AES-XTS 加密，加密时必须加 --aes_xts，否则启动失败！
 #   2. ★★ 地址必须和 partitions.csv 对齐 ★★
 #        分区表分区布局（本工程 partitions.csv）：
 #          bootloader : 0x2000
